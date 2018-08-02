@@ -1,8 +1,11 @@
 """
 WSGI (Web Server Gateway Interface) file for PyTaskManager.
 """
-import pytaskmanager as ptm
+import os
+import mod_wsgi
 
+import pytaskmanager as ptm
+import pytaskmanager.server
 
 import logging
 logging.getLogger("urllib3").setLevel(logging.WARNING)
@@ -16,7 +19,16 @@ ctx.init(ctx.config_file, 'prod')
 ptm.server.init_resources(ctx)
 
 
-uri = ctx.get_database_location()
-ptm.server.db.init(uri)
+# uri = ctx.get_database_location()
+# ptm.server.db.init(uri)
+env = mod_wsgi.application_group
+if env not in ['dev', 'test', 'acc', 'prod']:
+    env = 'prod'
+
+
+print('-' * 80)
+print('Using environment: {}'.format(env))
+print('-' * 80)
+ptm.server.init(env)
 
 application = ptm.server.app
