@@ -134,7 +134,7 @@ def init(environment=None):
             environment = 'prod'
 
     # Load configuration and initialize logging system
-    ctx = util.ServerContext(APPNAME, 'default')
+    ctx = util.ServerContext('pytaskmanager', 'default')
     ctx.init(ctx.config_file, environment)
 
     # Load the flask.Resources
