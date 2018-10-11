@@ -116,13 +116,34 @@ def load_resources(api, API_BASE, resources):
 # ------------------------------------------------------------------------------
 @app.route(WEB_BASE+'/', defaults={'path': ''})
 @app.route(WEB_BASE+'/<path:path>')
-def index():
+def index(path):
     return "Hello, World"
 
 
 # ------------------------------------------------------------------------------
 # init & run
 # ------------------------------------------------------------------------------
+def init(environment=None):
+    """Initialize the server using a site-wide ServerContext."""
+    logging.getLogger("urllib3").setLevel(logging.WARNING)
+
+    if environment is None:
+        if 'environment' in os.environ:
+            environment = os.environ['environment']
+        else:
+            environment = 'prod'
+
+    # Load configuration and initialize logging system
+    ctx = util.ServerContext(APPNAME, 'default')
+    ctx.init(ctx.config_file, environment)
+
+    # Load the flask.Resources
+    init_resources(ctx)
+
+    uri = ctx.get_database_location()
+    db.init(uri)
+
+
 def init_resources(ctx):
     # Load resources
     global RESOURCES_INITIALIZED
