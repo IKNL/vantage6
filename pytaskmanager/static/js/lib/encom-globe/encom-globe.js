@@ -42504,7 +42504,7 @@ var Marker = function(lat, lon, text, altitude, previous, scene, _opts){
             color: this.opts.lineColor,
             transparent: true,
             linewidth: 3,
-            opacity: .5
+            opacity: .7
         });
 
         _this.geometrySplineDotted = new THREE.Geometry();
@@ -42525,15 +42525,22 @@ var Marker = function(lat, lon, text, altitude, previous, scene, _opts){
             // var nextlat = ((90 + lat1 + j*1)%180)-90;
             // var nextlon = ((180 + lng1 + j*1)%360)-180;
 
+            // latidude: north-south, [90, -90]
+            // var nextlat = (((90 + previous.lat + j*latdist)%180)-90) * (.5 + Math.cos(j*(5*Math.PI/2)/_this.opts.lineSegments)/2) + (j*lat/_this.opts.lineSegments/2);
+            var nextlat = (previous.lat + j*latdist) % 180;
 
-            var nextlat = (((90 + previous.lat + j*latdist)%180)-90) * (.5 + Math.cos(j*(5*Math.PI/2)/_this.opts.lineSegments)/2) + (j*lat/_this.opts.lineSegments/2);
-            var nextlon = ((180 + previous.lon + j*londist)%360)-180;
+            // longitude: east-west, [0, 360]
+            // var nextlon = ((180 + previous.lon + j*londist) % 360) - 180;
+            var nextlon = (previous.lon + j*londist) % 360;
+
             pointList.push({lat: nextlat, lon: nextlon, index: j});
+
             if(j == 0 || j == _this.opts.lineSegments){
                 pointList2.push({lat: nextlat, lon: nextlon, index: j});
             } else {
                 pointList2.push({lat: nextlat+1, lon: nextlon, index: j});
             }
+
             // var thisPoint = mapPoint(nextlat, nextlon);
             sPoint = new THREE.Vector3(startPoint.x*1.2, startPoint.y*1.2, startPoint.z*1.2);
             sPoint2 = new THREE.Vector3(startPoint.x*1.2, startPoint.y*1.2, startPoint.z*1.2);
@@ -42580,7 +42587,7 @@ var Marker = function(lat, lon, text, altitude, previous, scene, _opts){
         update();
 
         this.scene.add(new THREE.Line(_this.geometrySpline, materialSpline));
-        this.scene.add(new THREE.Line(_this.geometrySplineDotted, materialSplineDotted, THREE.LinePieces));
+        // this.scene.add(new THREE.Line(_this.geometrySplineDotted, materialSplineDotted, THREE.LinePieces));
     }
 
     this.scene.add(this.marker);

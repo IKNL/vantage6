@@ -122,7 +122,7 @@ class Login extends React.Component {
         const ctx = this;
 
         $.post({
-            url: "/api/token",
+            url: "/api/token/user",
             data: {
                 username: username, 
                 password: password
@@ -579,12 +579,11 @@ class DashboardGlobeDisplay extends React.Component {
             introLinesDuration: 2000,
             maxPins: 500,
             maxMarkers: 500,
-            viewAngle: 0
+            viewAngle: 0.8
         });
 
         $("#globe").append(globe.domElement);
         globe.init(start);
-        // globe.renderer.setClearColor('#121831', 0);
         globe.renderer.setClearColor('#000000', 0);
 
         function animate() {
