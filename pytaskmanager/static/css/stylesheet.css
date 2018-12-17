@@ -26,6 +26,7 @@ html, body {
 body {
     /*background-color: white;*/
     background-color: #121831;
+    background-image: url('../img/background-large.jpg');
     color: white;
 
     /*padding: 10px;*/
@@ -77,7 +78,8 @@ span.logout {
     /*display: none;*/
     width: 400px;
 
-    background-color: #272743;
+    /*background-color: #272743;*/
+    background-color: #00000080;
 
     border: 1px solid cyan;
     border-radius: 10px;
@@ -149,7 +151,7 @@ span.logout {
     border: 1px solid #7e9295;
     padding: 2px;
 
-    background-color: rgba(0, 0, 0, 0.7);
+    background-color: rgba(0, 0, 0, 0.3);
 }
 
 .dashboard-collaboration {
@@ -162,11 +164,6 @@ span.logout {
     /*background-color: #121831;*/
 }
 
-/*
-
-    background-color: rgba(100, 0, 0, 0.7);
-}
-*/
 .nav-pills > li > a {
     /* adjust padding for height of tabs*/
     margin-top: 10px;

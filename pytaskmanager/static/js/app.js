@@ -370,7 +370,7 @@ class DashboardTerminalDisplay extends React.Component {
               allowTransparency: true,
               theme: {
                 // background: '#0e1326'
-                background: 'rgba(0, 0, 0, 0.5)',
+                background: 'rgba(0, 0, 0, 0.0)',
               }
             });
 
@@ -529,7 +529,7 @@ class DashboardLogDisplay extends React.Component {
               allowTransparency: true,
               theme: {
                 // background: '#0e1326'
-                background: 'rgba(0, 0, 0, 0.5)',
+                background: 'rgba(0, 0, 0, 0.0)',
               }
             });
 
