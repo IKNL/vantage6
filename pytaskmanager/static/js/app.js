@@ -39,32 +39,34 @@ class Application extends React.Component {
 
         this.onLogin = this.onLogin.bind(this);
         this.onLogout = this.onLogout.bind(this);
-    }
+    };
 
     onLogin(username, access_token, refresh_token) {
         console.log('onLogin: ', username);
         console.log('setting state ... ');
+
+        // setState triggers rerendering of components, so
+        // this has to happen *before* setState
+        this.storage.setItem('username', username);
+        this.storage.setItem('access_token', access_token);
 
         this.setState({
             username: username,
             access_token: access_token,
             refresh_token: refresh_token
         });
-
-        this.storage.setItem('username', username);
-        this.storage.setItem('access_token', access_token);
     };
 
     onLogout() {
         console.log('onLogout: ', this.state.username);
 
+        this.storage.setItem('access_token', '');        
+        this.storage.setItem('refresh_token', '');        
+
         this.setState({
             access_token: '',
             refresh_token: ''
         });
-
-        this.storage.setItem('access_token', '');        
-        this.storage.setItem('refresh_token', '');        
     }
 
     render() {
@@ -128,11 +130,11 @@ class Login extends React.Component {
         })
         .done(function(data) {
             console.log("successfully authenticated!");
-            ctx.setState({username: username});
-            ctx.setState({access_token: data.access_token});
-            ctx.setState({refresh_token: data.refresh_token});
-            ctx.setState({refresh_url: data.refresh_url});
-            ctx.setState({user_url: data.user_url});
+            // ctx.setState({username: username});
+            // ctx.setState({access_token: data.access_token});
+            // ctx.setState({refresh_token: data.refresh_token});
+            // ctx.setState({refresh_url: data.refresh_url});
+            // ctx.setState({user_url: data.user_url});
 
             $('#login-form').fadeOut(200, function() {
                 console.log('notifying Application ...')
@@ -193,6 +195,55 @@ class DashboardBlankDisplay extends React.Component {
     }
 };
 
+class DashboardTabDisplay extends React.Component {
+    constructor(props) {
+        super(props);
+
+        this.state = {
+            key: 1
+        }
+
+        this.handleSelect = this.handleSelect.bind(this);
+    }
+
+    handleSelect(key) {
+        // alert(`selected ${key}`);
+        console.log(`selected ${key}`);
+
+        this.setState({
+            key: key
+        });
+
+    }
+
+    render() {
+        var Tabs = ReactBootstrap.Tabs;
+        var Tab = ReactBootstrap.Tab;
+
+        return(
+            <Tabs 
+                bsStyle="pills"
+                activeKey={this.state.key}
+                onSelect={this.handleSelect}
+                mountOnEnter={true}
+                id="bottom-tabs"
+                >
+              <Tab eventKey={1} title="LOG">
+                <DashboardLogDisplay
+                    socket={this.props.socket}
+                />
+              </Tab>
+              <Tab eventKey={2} title="TERMINAL">
+                <DashboardTerminalDisplay />
+              </Tab>
+              <Tab eventKey={3} title="Tab 3" disabled>
+                Tab 3 content
+              </Tab>
+            </Tabs>
+        );
+    };
+};
+
 class DashboardNavDisplay extends React.Component {
     render() {
         return(
@@ -227,23 +278,25 @@ class DashboardNodeDisplay extends React.Component {
         var socket = this.props.socket;
         var ctx = this;
 
-        socket.on('connect', function() {
-            socket.on("node-status-changed", function(data) {
-                console.log('node-status-changed', data);
-                ctx.updateState(ctx);
-            });            
-        });
+        if (socket) {
+            socket.on('connect', function() {
+                socket.on("node-status-changed", function(data) {
+                    console.log('node-status-changed', data);
+                    ctx.updateState(ctx);
+                });            
+            });
 
-        this.updateState(this);
+            this.updateState(this);            
+        }
     }
 
     renderNode(node) {
         var status;
 
-        if (node.status == 'online') {
-            status = <span className='small right green'>online</span>
+        if (node.status == 'offline') {
+            status = <span className='small right red'>{node.status}</span>
         } else {
-            status = <span className='small right red'>offline</span>
+            status = <span className='small right green'>{node.status}</span>
         }
 
         return(
@@ -290,9 +343,6 @@ class DashboardNodeDisplay extends React.Component {
 class DashboardTerminalDisplay extends React.Component {
     constructor(props) {
         super(props);
-        this.app = props.app;
-
-        Terminal.applyAddon(fit);
     }
 
     componentDidMount() {
@@ -307,6 +357,8 @@ class DashboardTerminalDisplay extends React.Component {
           }
         };
 
+        console.log('socket_options: ', socket_options);
+
         var socket = io.connect('/pty', socket_options);
         socket.on('connect', function() {
             var term = new Terminal({
@@ -315,8 +367,10 @@ class DashboardTerminalDisplay extends React.Component {
               cursorStyle: "underline",
               fontSize: 11,
               fontFamily: 'fira_mono',
+              allowTransparency: true,
               theme: {
-                background: '#0e1326'
+                // background: '#0e1326'
+                background: 'rgba(0, 0, 0, 0.5)',
               }
             });
 
@@ -363,23 +417,14 @@ class DashboardTerminalDisplay extends React.Component {
 
             // term.toggleFullScreen(true)
             term.fit();
-
-            term.textarea.focus();
-            term.writeln('-'.repeat(80));
-            term.writeln('Connected to interpreter. Hit [enter] if the screen remains blank.');
-            term.writeln('-'.repeat(80));                
+            //term.textarea.focus();
         });
-
     }    
 
     render() {
         return(
-            <div>
-                <div className="dashboard-header">
-                    terminal
-                </div>
-                <div id="terminal">
-                </div>
+            <div className="dashboard-panel">
+                <div id="terminal"></div>
             </div>
         ) 
     }
@@ -388,70 +433,126 @@ class DashboardTerminalDisplay extends React.Component {
 class DashboardLogDisplay extends React.Component {
     constructor(props) {
         super(props);
-        this.app = props.app;
-
-        Terminal.applyAddon(fit);
+        this.term = null;
+        // this.connectSocketEvents = this.connectSocketEvents.bind(this);
     }
+
+    /*
+    // This is only necesary if the socket provided throug `this.props`
+    // is not connected when `componentDidMount()` is called.
+    componentDidUpdate(prevProps, prevState, snapshot) {
+        console.log('componentDidUpdate')
+
+        if (this.props.socket !== prevProps.socket) {
+            console.log('*** new socket ***');
+            this.connectSocketEvents(this.props.socket);
+        } else if (this.props.socket === null) {
+            console.log('no socket :-(');
+        } else {
+            console.log('no change in sockets');
+        }
+    }
+    */
 
     componentDidMount() {
         var socket = this.props.socket;
+
+        if (socket) {
+            var _this = this;
+
+            // For some reason this doesn't always work?
+            // Delay opening the terminal until all fonts have loaded.
+            /*
+            document.fonts.ready.then(function () {
+                console.log('All fonts in use by visible text have loaded.');
+                console.log('fira_mono loaded? ' + document.fonts.check('11px fira_mono'));
+
+                _this.connectSocketEvents(socket);
+            });
+            */
+
+            this.connectSocketEvents(socket);
+        } else {
+            console.log('DashboardLogDisplay.componentDidMount() - no socket :-(');
+        }
+    }
+
+    connectSocketEvents(socket) {
+        console.log('DashboardLogDisplay.connectSocketEvents()')
+
+        // define event handlers
+        socket.on("append-log", function(data) {
+            if (this.term) {
+                this.term.writeln(data);
+            } else {
+                console.warn('this.term is not set!');
+            }
+        });
+
+        socket.on('disconnect', function() {
+          console.log("disconnected /admin!!!!");
+          if (this.term) {
+              this.term.destroy();
+          } else {
+              console.warn('this.term is not set!');
+          }
+
+          socket.close();
+          socket.open();
+        });
+
+
+        function debounce(func, wait_ms) {
+          let timeout
+          return function(...args) {
+            const context = this
+            clearTimeout(timeout)
+            timeout = setTimeout(() => func.apply(context, args), wait_ms)
+          }
+        }
+
+        function fitToscreen() {
+          this.term.fit()
+          socket.emit("resize", {"cols": this.term.cols, "rows": this.term.rows})
+        }
+
         socket.on('connect', function() {
-            var term = new Terminal({
+            console.log('DashboardLogDisplay *** connected ***');
+            console.log(socket);
+
+            this.term = new Terminal({
               screenKeys: true,
               cursorBlink: true,
               cursorStyle: "underline",
               fontSize: 11,
-              fontFamily: 'fira_mono',
+              fontFamily: 'courier new',
+              allowTransparency: true,
               theme: {
-                background: '#0e1326'
+                // background: '#0e1326'
+                background: 'rgba(0, 0, 0, 0.5)',
               }
             });
 
-            // define event handlers
-            socket.on("append-log", function(data) {
-                term.writeln(data);
-            });
-
-            socket.on('disconnect', function() {
-              console.log("disconnected /admin!!!!")
-              term.destroy();
-              socket.close();
-              socket.open();
-            });
-
-            function debounce(func, wait_ms) {
-              let timeout
-              return function(...args) {
-                const context = this
-                clearTimeout(timeout)
-                timeout = setTimeout(() => func.apply(context, args), wait_ms)
-              }
-            }
-
-            function fitToscreen() {
-              term.fit()
-              socket.emit("resize", {"cols": term.cols, "rows": term.rows})
-            }
 
             // open the terminal
-            term.open(document.getElementById('log'));
+            this.term.open(document.getElementById('log'));
             const wait_ms = 50;
             window.onresize = debounce(fitToscreen, wait_ms);
 
-            term.fit();
+            this.term.fit();
         });
-    }
+    }    
 
     render() {
+        if (this.term) {
+            this.term.fit();        
+        }
+
         return(
-            <div>
-                <div className="dashboard-header">
-                    log
-                </div>
-                <div id="log">
-                </div>
+            <div className="dashboard-panel">
+                <div id="log"></div>
             </div>
-        ) 
+        );
     };
 };
 
@@ -467,7 +568,7 @@ class DashboardGlobeDisplay extends React.Component {
 
         var globe = new ENCOM.Globe(width, height, {
             font: "monaco",
-            data: data.slice(), 
+            // data: data.slice(), 
             tiles: grid.tiles,
             baseColor: 'cyan',
             markerColor: 'yellow',
@@ -483,14 +584,11 @@ class DashboardGlobeDisplay extends React.Component {
 
         $("#globe").append(globe.domElement);
         globe.init(start);
-        // console.log('-'.repeat(80));
-        // console.log(globe.renderer);
-        // console.log('-'.repeat(80));
-        globe.renderer.setClearColor('#121831');
+        // globe.renderer.setClearColor('#121831', 0);
+        globe.renderer.setClearColor('#000000', 0);
 
-        function animate(){
-
-            if(globe){
+        function animate() {
+            if (globe) {
                 globe.tick();
             }
 
@@ -501,41 +599,52 @@ class DashboardGlobeDisplay extends React.Component {
             animate();
 
             /* add pins at random locations */
-            setInterval(function(){
-                var lat = Math.random() * 180 - 90,
-                   lon = Math.random() * 360 - 180,
-                   name = "Test " + Math.floor(Math.random() * 100);
+            // setInterval(function(){
+            //     var lat = Math.random() * 180 - 90,
+            //        lon = Math.random() * 360 - 180,
+            //        name = "Test " + Math.floor(Math.random() * 100);
 
-                globe.addPin(lat,lon, name);
+            //     globe.addPin(lat,lon, name);
 
-            }, 5000);
+            // }, 5000);
 
-            setTimeout(function() {
-                var constellation = [];
-                var opts = {
-                    coreColor: 'orange',
-                    numWaves: 8
-                };
-                var alt =  1.3;
+            // setTimeout(function() {
+            //     var constellation = [];
+            //     var opts = {
+            //         coreColor: 'orange',
+            //         numWaves: 8
+            //     };
+            //     var alt =  1.3;
 
-                for(var i = 0; i< 2; i++){
-                    for(var j = 0; j< 3; j++){
-                         constellation.push({
-                            lat: 50 * i - 30 + 15 * Math.random(), 
-                             lon: 120 * j - 120 + 30 * i, 
-                             altitude: alt
-                             });
-                    }
-                }
+            //     for(var i = 0; i< 2; i++){
+            //         for(var j = 0; j< 3; j++){
+            //              constellation.push({
+            //                 lat: 50 * i - 30 + 15 * Math.random(), 
+            //                  lon: 120 * j - 120 + 30 * i, 
+            //                  altitude: alt
+            //                  });
+            //         }
+            //     }
 
-                globe.addConstellation(constellation, opts);
-            }, 4000);
+            //     globe.addConstellation(constellation, opts);
+            // }, 4000);
 
             /* add the connected points that are in the movie */
             setTimeout(function(){
-                globe.addMarker(49.25, -123.1, "Vancouver");
-                globe.addMarker(35.6895, 129.69171, "Tokyo", true);
+                globe.addMarker(23.6978, 120.9605, "Taipei", true);
+                globe.addPin(23.6978, 120.9605, "").hideSmoke();
+
+                globe.addMarker(52.0907, 5.1214, "Utrecht", true);
+                globe.addPin(52.0907, 5.1214, "").hideSmoke();
+
+                globe.addMarker(41.9028, 12.4964, "Rome", true);
+                globe.addPin(41.9028, 12.4964, "").hideSmoke();
             }, 2000);
+
+            // setTimeout(function(){
+            //     globe.addPin(49.25, -123.1, "Vancouver");
+            //     globe.addPin(35.6895, 129.69171, "Tokyo", true);
+            // }, 2000);
         }
 
     }
@@ -626,10 +735,10 @@ class DashboardGlobeDisplay extends React.Component {
     render() {
         return(
             <div>
-                <div className="dashboard-header">
-                    World view
+                <div className="dashboard-header">World view</div>
+                <div className="dashboard-panel">
+                    <div id="globe"></div>
                 </div>
-                <div id="globe"></div>
             </div>
         )
     }
@@ -641,7 +750,7 @@ class Dashboard extends React.Component {
         this.app = props.app;
 
         var token = localStorage.getItem('access_token');
-        var socket_options = {
+        this.socket_options = {
           transportOptions: {
             polling: {
               extraHeaders: {
@@ -651,13 +760,31 @@ class Dashboard extends React.Component {
           }
         };
 
+        Terminal.applyAddon(fit);
+
         this.state = {
-            admin_socket: io.connect('/admin', socket_options)
+            admin_socket: io.connect('/admin', this.socket_options)
         };
-    }
+    };
 
     componentDidMount() {
-    }
+        var socket = this.state.admin_socket;
+
+        socket.on('error', (error) => {
+            console.log('error: ', error);
+            this.app.onLogout();
+        });
+
+        socket.on('connect_error', (error) => {
+            console.log('connect_error: ', error);
+            // this.app.onLogout();
+        });
+
+        socket.on('disconnect', (reason) => {
+            console.log('disconnect: ', reason);
+            alert(reason);
+        });
+    };
 
     render() {
         return(
@@ -667,39 +794,48 @@ class Dashboard extends React.Component {
                     onLogout={this.props.onLogout}
                     />
 
-                <div className="dashboard-content">
+                <div className="container-fluid dashboard-content">
 
                     <div className="row">
-                        <div className="col-3">
+                        <div className="col-xs-3">
                             <DashboardNodeDisplay
                                 app={this.app} 
                                 socket={this.state.admin_socket}
                             />
                         </div>
 
-                        <div className="col-6">
-                            <DashboardTerminalDisplay
-                                app={this.app} 
-                            />
+                        <div className="col-xs-6">
+                            <div className="dashboard-header">Cheddar header</div>
+                            what shall we put here?
                         </div>
 
-                        <div className="col-3">
+                        <div className="col-xs-3">
                             <DashboardGlobeDisplay 
                                 app={this.app}
                                 socket={this.state.admin_socket}
                             />
                         </div>
                     </div>
-
+                    
                     <div className="row">
-                        <div className="col">
-                            <DashboardLogDisplay
+                        <div className="col-xs-12">
+                            <DashboardTabDisplay 
                                 app={this.app}
                                 socket={this.state.admin_socket}
                             />
                         </div>
                     </div>
 
+                    {/*
+                    <div className="row">
+                        <div className="col-xs-12">
+                            <DashboardLogDisplay
+                                app={this.app}
+                                socket={this.state.admin_socket}
+                            />
+                        </div>
+                    </div>
+                    */}
                 </div>
             </div>
         );

@@ -42021,7 +42021,7 @@ function Globe(width, height, opts){
 
     this.setScale(this.scale);
 
-    this.renderer = new THREE.WebGLRenderer( { antialias: true } );
+    this.renderer = new THREE.WebGLRenderer( { antialias: true, alpha: true } );
     this.renderer.setSize( this.width, this.height);
 
     this.renderer.gammaInput = true;

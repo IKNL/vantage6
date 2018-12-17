@@ -117,43 +117,79 @@ span.logout {
 
 .dashboard-outer {
     /*border: 1px solid red;*/
+    height: 100%;
 }
 
 .dashboard-nav {
     border-bottom: 1px solid #7e9295;
-    background-color: #0e1326;
+    background-color: #0e13260f;
     padding: 2px 15px;
+
+    /*font-family: fira_mono;*/
 }
 
 .dashboard-content {
     /*display: none;*/
+    height: calc(100% - 45px);
+
     margin: 10px;
     padding: 5px 15px;
 }
 
 .dashboard-header {
     font-family: united_sans_medium;
-    border-bottom: 1px solid #7e9295;
+    /*border-bottom: 1px solid #7e9295;*/
     text-transform: uppercase;
     /*padding: 2px 0px;*/
 }
 
+.dashboard-panel {
+    /*border-top:    1px solid #7e9295;*/
+    /*border-bottom: 1px solid #7e9295;*/
+    border: 1px solid #7e9295;
+    padding: 2px;
+
+    background-color: rgba(0, 0, 0, 0.7);
+}
 
 .dashboard-collaboration {
     /*margin-top: 10px;*/
 }
 
 #globe {
-    height: 350px;
-    background-color: #121831;
+    /*height: 200px;*/
+    height: calc(100% - 25px);
+    /*background-color: #121831;*/
+}
+
+/*
+
+    background-color: rgba(100, 0, 0, 0.7);
+}
+*/
+.nav-pills > li > a {
+    /* adjust padding for height of tabs*/
+    margin-top: 10px;
+    margin-bottom: 5px;
+    padding-top: 2px; 
+    padding-bottom: 2px;
+
+}
+
+.row {
+    height: 50%;
+}
+
+#bottom-tabs {
+    height: 100%;
 }
 
 /* for later ... */
 #terminal, #log {
-    width: 100%; 
-    height: 350px;
+    /*width: 100%; */
+    /*height: 280px;*/
+    height: calc(100% - 50px);
 
-    border-bottom: 1px solid #7e9295;
-    /*background-color: black;*/
+    /*background-color: #0e1326;*/
     /*padding: 2px;*/
 }

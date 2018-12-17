@@ -25,20 +25,21 @@ def only_for(types = ['user', 'node', 'container']):
     def protection_decorator(fn):
         @wraps(fn)
         def decorator(*args, **kwargs):
-
             # decode JWT-token
             identity = get_jwt_identity()
             claims = get_jwt_claims()
 
             # check that identity has access to endpoint            
             g.type = claims["type"]
-            log.debug(f"Endpoint accessed as {g.type}")
+            # log.debug(f"Endpoint accessed as {g.type}")
+
             if g.type not in types:
                 log.warning(f"Illegal attempt from {g.type} to access endpoint")
                 raise Exception(f"{g.type}'s are not allowed!")
 
             # do some specific stuff per identity
             g.user = g.container = g.node = None
+
             if g.type == 'user':
                 user = get_and_update_authenticatable_info(identity)
                 g.user = user
