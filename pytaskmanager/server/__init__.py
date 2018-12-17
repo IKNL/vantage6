@@ -21,7 +21,7 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager, get_jwt_identity, get_jwt_claims, get_raw_jwt, jwt_required, jwt_optional, verify_jwt_in_request
 
 from flask_marshmallow import Marshmallow
-from flask_socketio import SocketIO, emit, send,join_room, leave_room
+from flask_socketio import SocketIO, emit, send,join_room, leave_room, disconnect
 import flask_socketio
 
 
@@ -165,7 +165,7 @@ ma = Marshmallow(app)
 # ------------------------------------------------------------------------------
 # Setup the Flask-JWT-Extended extension (JWT: JSON Web Token)
 # ------------------------------------------------------------------------------
-app.config['JWT_SECRET_KEY'] = 'f8a87430-fe18-11e7-a7b2-a45e60d00d91'
+# app.config['JWT_SECRET_KEY'] = 'f8a87430-fe18-11e7-a7b2-a45e60d00d91'
 jwt = JWTManager(app)
 
 @jwt.user_claims_loader
@@ -222,8 +222,15 @@ socketio.on_namespace(DefaultSocketNamespace("/tasks"))
 def start_interpreter():
     # create child process attached to a pty we can read from and write to
     if TERMINAL_AVAILABLE:
+        # This works:
         env = app.config['environment']
         cmd = ['ipython', '-m', 'pytaskmanager.server.shell', '-i', '--', env]
+
+        # This works:
+        # cmd = ['login']
+
+        # This also works :-)
+        # cmd = ['/Users/melle/ptm/ssh.sh']
 
         log.debug("opening pty")
         master_fd, slave_fd = pty.openpty()
@@ -257,9 +264,7 @@ def start_interpreter():
         log.debug("ipython terminal not available")
 
 
-def assert_running_interpreter(start_if_required=False, child=None):
-    # log.debug(f"assert_running_interpreter(start_if_required={start_if_required})")
-
+def assert_running_interpreter(child=None):
     try:
         child = child or session.child
 
@@ -269,18 +274,11 @@ def assert_running_interpreter(start_if_required=False, child=None):
     except (AttributeError, TypeError):
         pass
 
-
-    if start_if_required:
-        # log.debug("starting interpreter")
-        start_interpreter()
-        return True
-
     return False
 
 def set_winsize(fd, row, col, xpix=0, ypix=0):
     winsize = struct.pack("HHHH", row, col, xpix, ypix)
     fcntl.ioctl(fd, termios.TIOCSWINSZ, winsize)
-
 
 def read_and_forward_pty_output(fd, sid, child):
     max_read_bytes = 1024 * 20
@@ -295,12 +293,20 @@ def read_and_forward_pty_output(fd, sid, child):
 
         for r in rs:
             output = os.read(r, max_read_bytes).decode()
-            socketio.emit(
-                "pty-output", 
-                {"output": output}, 
-                namespace="/pty",
-                room=sid,
-            )
+            # log.debug(f'interpreter: {output}')
+
+            if not output:
+                log.warning('EOF!?')
+                disconnect(namespace='/pty')
+                return
+
+            else:
+                socketio.emit(
+                    "pty-output",
+                    {"output": output},
+                    namespace="/pty",
+                    room=sid,
+                )
 
 
 @socketio.on("connect", namespace="/pty")
@@ -339,7 +345,7 @@ def connect_pty():
         session.name = auth.username if session.type == 'user' else auth.name
         log.info(f'Client identified as <{session.type}>: <{session.name}>')
 
-        assert_running_interpreter(start_if_required=True)
+        start_interpreter()
         return True
 
     return False
@@ -362,15 +368,14 @@ def pty_input(data):
     """write to the child pty. The pty sees this as if you are typing in a real
     terminal.
     """
+    input_data = data["input"]
     if assert_running_interpreter():
-        raw_data = data["input"].encode()
-        # if raw_data == '':
-        #     log.error('empty string!?')
-        # else:
-        #     log.info(f"input: '{raw_data}'")
+        os.write(session.fd, input_data.encode())
+    else:
+        log.error("it's dead so I'm killing it ... ")
+        disconnect(namespace='/pty')
 
-        # os.write(app.config["fd"], raw_data)
-        os.write(session.fd, raw_data)
+
 
 
 @socketio.on("resize", namespace="/pty")
@@ -542,21 +547,21 @@ def run(ctx, *args, **kwargs):
 
     environment = ctx.config.get('type')
     app.config['environment'] = environment
+    app.config['JWT_SECRET_KEY'] = ctx.config.get('jwt_secret_key', 'f8a87430')
 
     # Set an extra long expiration time on access tokens for testing
     if environment == 'test':
         log.warning("Setting 'JWT_ACCESS_TOKEN_EXPIRES' to one day!")
         app.config['JWT_ACCESS_TOKEN_EXPIRES'] = datetime.timedelta(days=1)
 
-    # print('-' * 80)
-    # print(app.root_path)
-    # print('-' * 80)
-
-    # Actually start the server
-    # app.run(*args, **kwargs)
-    nodes, session = db.Node.get(with_session=True)
-    for node in nodes:
-        node.status = 'offline'
+    # Killing the server (ctrl-c) doens't give it time to handle
+    # all the disconnect events. This is to ensure that all connections
+    # are marked as 'offline' until they (re)connect.
+    # FIXME: Perhaps we should have a cleanup-handler?
+    identities, session = db.Authenticatable.get(with_session=True)
+    for identity in identities:
+        identity.status = 'offline'
     session.commit()
 
+    # Actually start the server
     socketio.run(app, *args, **kwargs)
