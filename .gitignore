@@ -9,3 +9,4 @@ pytaskmanager.egg-info
 .ipynb_checkpoints
 .idea/
 node_modules
+pytaskmanager/static.bak
