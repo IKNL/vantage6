@@ -158,6 +158,13 @@ span.logout {
     /*margin-top: 10px;*/
 }
 
+.dashboard-clock {
+    font-family: united_sans_medium;
+    font-size: 52px;
+    text-align: center;
+    color: #7e9295;
+}
+
 #globe {
     /*height: 200px;*/
     height: calc(100% - 25px);

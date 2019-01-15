@@ -341,9 +341,6 @@ class DashboardNodeDisplay extends React.Component {
 };
 
 class DashboardTerminalDisplay extends React.Component {
-    constructor(props) {
-        super(props);
-    }
 
     componentDidMount() {
         var token = localStorage.getItem('access_token');
@@ -512,8 +509,9 @@ class DashboardLogDisplay extends React.Component {
         }
 
         function fitToscreen() {
-          this.term.fit()
-          socket.emit("resize", {"cols": this.term.cols, "rows": this.term.rows})
+            console.log(this.term);
+            this.term.fit();
+            socket.emit("resize", {"cols": this.term.cols, "rows": this.term.rows})
         }
 
         socket.on('connect', function() {
@@ -560,6 +558,352 @@ class DashboardGlobeDisplay extends React.Component {
     componentDidMount() {
         //this.renderGlobe();
         this.renderEncomGlobe();
+        // this.renderFlamoxGlobe();
+    }
+
+    renderFlamoxGlobe() {
+        console.log('renderFlamoxGlobe');
+
+        // Three group objects
+        this.groups = {
+            main: null, // A group containing everything
+            globe: null, // A group containing the globe sphere (and globe dots)
+            globeDots: null, // A group containing the globe dots
+            lines: null, // A group containing the lines between each country
+            lineDots: null // A group containing the line dots
+        };
+
+        // Map properties for creation and rendering
+        this.props_ = {
+            mapSize: {
+                // Size of the map from the intial source image (on which the dots are positioned on)
+                width: 2048 / 2,
+                height: 1024 / 2
+            },
+            globeRadius: 200, // Radius of the globe (used for many calculations)
+            dotsAmount: 20, // Amount of dots to generate and animate randomly across the lines
+            startingCountry: 'hongkong', // The key of the country to rotate the camera to during the introduction animation (and which country to start the cycle at)
+            colours: {
+                // Cache the colours
+                globeDots: 'rgb(61, 137, 164)', // No need to use the Three constructor as this value is used for the HTML canvas drawing 'fillStyle' property
+                lines: new THREE.Color('#18FFFF'),
+                lineDots: new THREE.Color('#18FFFF')
+            },
+            alphas: {
+                // Transparent values of materials
+                globe: 0.4,
+                lines: 0.5
+            }
+        };
+
+        // Angles used for animating the camera
+        this.camera = {
+            object: null, // Three object of the camera
+            controls: null, // Three object of the orbital controls
+            angles: {
+                // Object of the camera angles for animating
+                current: {
+                    azimuthal: null,
+                    polar: null
+                },
+                target: {
+                    azimuthal: null,
+                    polar: null
+                }
+            }
+        };
+
+        // Booleans and values for animations
+        this.animations = {
+            finishedIntro: false, // Boolean of when the intro animations have finished
+            dots: {
+                current: 0, // Animation frames of the globe dots introduction animation
+                total: 170, // Total frames (duration) of the globe dots introduction animation,
+                points: [] // Array to clone the globe dots coordinates to
+            },
+            globe: {
+                current: 0, // Animation frames of the globe introduction animation
+                total: 80, // Total frames (duration) of the globe introduction animation,
+            },
+            countries: {
+                active: false, // Boolean if the country elements have been added and made active
+                animating: false, // Boolean if the countries are currently being animated
+                current: 0, // Animation frames of country elements introduction animation
+                total: 120, // Total frames (duration) of the country elements introduction animation
+                selected: null, // Three group object of the currently selected country
+                index: null, // Index of the country in the data array
+                timeout: null, // Timeout object for cycling to the next country
+                initialDuration: 5000, // Initial timeout duration before starting the country cycle
+                duration: 2000 // Timeout duration between cycling to the next country
+            }
+        };
+
+        // Boolean to enable or disable rendering when window is in or out of focus
+        this.isHidden = false;
+
+
+        function returnSphericalCoordinates(latitude, longitude) {
+            /*
+                This function will take a latitude and longitude and calculate the
+                projected 3D coordiantes using Mercator projection relative to the
+                radius of the globe.
+
+                Reference: https://stackoverflow.com/a/12734509
+            */
+
+            // Convert latitude and longitude on the 90/180 degree axis
+            latitude = ((latitude - props.mapSize.width) / props.mapSize.width) * -180;
+            longitude = ((longitude - props.mapSize.height) / props.mapSize.height) * -90;
+
+            // Calculate the projected starting point
+            var radius = Math.cos(longitude / 180 * Math.PI) * props.globeRadius;
+            var targetX = Math.cos(latitude / 180 * Math.PI) * radius;
+            var targetY = Math.sin(longitude / 180 * Math.PI) * props.globeRadius;
+            var targetZ = Math.sin(latitude / 180 * Math.PI) * radius;
+
+            return {
+                x: targetX,
+                y: targetY,
+                z: targetZ
+            };
+        }
+
+        function getData(ctx) {
+            $.get('js/lib/flamov-globe/globe-points.json')
+            .done(function(data) {
+                ctx.data = data;
+                setupScene(ctx);
+            });
+        };
+
+        function setupScene(ctx) {
+            ctx.scene = new THREE.Scene();
+            ctx.renderer = new THREE.WebGLRenderer({
+                antialias: true,
+                alpha: true,
+                shadowMapEnabled: false
+            });
+
+            var globe = $('#globe');
+            globe.append(ctx.renderer.domElement);
+
+            ctx.renderer.setSize(globe.clientWidth, globe.clientHeight);
+            console.log('ctx.rendere', ctx.renderer);
+
+            ctx.renderer.setPixelRatio(1);
+            ctx.renderer.setClearColor(0x000000, 0);
+
+            // Main group that contains everything
+            ctx.groups.main = new THREE.Group();
+            ctx.groups.main.name = 'Main';
+
+            // Group that contains lines for each country
+            ctx.groups.lines = new THREE.Group();
+            ctx.groups.lines.name = 'Lines';
+            ctx.groups.main.add(ctx.groups.lines);
+
+            // Group that contains dynamically created dots
+            ctx.groups.lineDots = new THREE.Group();
+            ctx.groups.lineDots.name = 'Dots';
+            ctx.groups.main.add(ctx.groups.lineDots);
+
+            // Add the main group to the scene
+            ctx.scene.add(ctx.groups.main);
+
+            // Render camera and add orbital controls
+            addCamera(ctx.camera, ctx.props_);
+            addControls(ctx.camera, ctx.props_);
+
+            // Render objects
+            addGlobe(ctx, ctx.props_);
+
+            if (Object.keys(ctx.data.countries).length > 0) {
+                // addLines();
+                // createListElements();
+            }
+
+            // Start the requestAnimationFrame loop
+            render_frame(ctx);
+            animate_scene(ctx);
+
+            var canvasResizeBehaviour = function() {
+                var container = $('#globe')[0];
+
+                // container.width = window.innerWidth;
+                // container.height = window.innerHeight;
+                // container.style.width = window.innerWidth + 'px';
+                // container.style.height = window.innerHeight + 'px';
+
+                ctx.camera.object.aspect = container.offsetWidth / container.offsetHeight;
+                ctx.camera.object.updateProjectionMatrix();
+                ctx.renderer.setSize(container.offsetWidth, container.offsetHeight);
+            };
+
+            window.addEventListener('resize', canvasResizeBehaviour);
+            window.addEventListener('orientationchange', function() {
+                setTimeout(canvasResizeBehaviour, 0);
+            });
+
+            canvasResizeBehaviour();
+        };
+
+        function addCamera(camera, props) {
+            var canvas = $('#globe');
+            camera.object = new THREE.PerspectiveCamera(60, canvas.clientWidth / canvas.clientHeight, 1, 10000);
+            camera.object.position.z = props.globeRadius * 2.2;
+        };
+
+        function addControls(camera, props) {
+            console.log('disabling camera controls');
+            // var canvas = $('#globe');
+            var canvas = document.getElementById('globe');
+            // console.log('canvas:', canvas);
+            // console.log('canvas:', document.getElementById('globe'));
+
+            camera.controls = new OrbitControls(camera.object, canvas);
+            camera.controls.enableKeys = false;
+            camera.controls.enablePan = false;
+            camera.controls.enableZoom = false;
+            camera.controls.enableDamping = false;
+            camera.controls.enableRotate = false;
+
+            // Set the initial camera angles to something crazy for the introduction animation
+            camera.angles.current.azimuthal = -Math.PI;
+            camera.angles.current.polar = 0;
+        };
+
+        function addGlobe(ctx, props) {
+            var textureLoader = new THREE.TextureLoader();
+            textureLoader.setCrossOrigin(true);
+
+            var radius = props.globeRadius - (props.globeRadius * 0.02);
+            var segments = 64;
+            var rings = 64;
+
+            // Make gradient
+            var canvasSize = 128;
+            var textureCanvas = document.createElement('canvas');
+            textureCanvas.width = canvasSize;
+            textureCanvas.height = canvasSize;
+
+            var canvasContext = textureCanvas.getContext('2d');
+            canvasContext.rect(0, 0, canvasSize, canvasSize);
+
+            var canvasGradient = canvasContext.createLinearGradient(0, 0, 0, canvasSize);
+            canvasGradient.addColorStop(0, '#5B0BA0');
+            canvasGradient.addColorStop(0.5, '#260F76');
+            canvasGradient.addColorStop(1, '#130D56');
+            canvasContext.fillStyle = canvasGradient;
+            canvasContext.fill();
+
+            // Make texture
+            var texture = new THREE.Texture(textureCanvas);
+            texture.needsUpdate = true;
+
+            var geometry = new THREE.SphereGeometry(radius, segments, rings);
+            var material = new THREE.MeshBasicMaterial({
+                map: texture,
+                transparent: true,
+                opacity: 0
+            });
+
+            var globe = new THREE.Mesh(geometry, material);
+
+            ctx.groups.globe = new THREE.Group();
+            ctx.groups.globe.name = 'Globe';
+
+            ctx.groups.globe.add(globe);
+            ctx.groups.main.add(ctx.groups.globe);
+
+            addGlobeDots(ctx, props);
+        };
+
+        function addGlobeDots(ctx, props) {
+            var geometry = new THREE.Geometry();
+
+            // Make circle
+            var canvasSize = 16;
+            var halfSize = canvasSize / 2;
+
+            var textureCanvas = document.createElement('canvas');
+            textureCanvas.width = canvasSize;
+            textureCanvas.height = canvasSize;
+
+            var canvasContext = textureCanvas.getContext('2d');
+            canvasContext.beginPath();
+            canvasContext.arc(halfSize, halfSize, halfSize, 0, 2 * Math.PI);
+            canvasContext.fillStyle = props.colours.globeDots;
+            canvasContext.fill();
+
+            // Make texture
+            var texture = new THREE.Texture(textureCanvas);
+            texture.needsUpdate = true;
+
+            var material = new THREE.PointsMaterial({
+                map: texture,
+                size: props.globeRadius / 120
+            });
+
+            var addDot = function(targetX, targetY) {
+                // Add a point with zero coordinates
+                var point = new THREE.Vector3(0, 0, 0);
+                geometry.vertices.push(point);
+
+                // Add the coordinates to a new array for the intro animation
+                var result = returnSphericalCoordinates(
+                    targetX,
+                    targetY
+                );
+
+                ctx.animations.dots.points.push(new THREE.Vector3(result.x, result.y, result.z));
+            };
+
+            for (var i = 0; i < ctx.data.points.length; i++) {
+                addDot(ctx.data.points[i].x, ctx.data.points[i].y);
+            }
+
+            for (var country in ctx.data.countries) {
+                addDot(ctx.data.countries[country].x, ctx.data.countries[country].y);
+            }
+
+            // Add the points to the scene
+            ctx.groups.globeDots = new THREE.Points(geometry, material);
+            ctx.groups.globe.add(ctx.groups.globeDots);
+        }
+
+
+        function animate_scene(ctx) {
+            if (ctx.isHidden === false) {
+                requestAnimationFrame(function() {
+                    animate_scene(ctx);
+                });
+            }
+
+            if (ctx.groups.globeDots) {
+                // introAnimate();
+            }
+
+            if (ctx.animations.finishedIntro === true) {
+                // animateDots();
+            }
+
+            if (ctx.animations.countries.animating === true) {
+                // animateCountryCycle();
+            }
+
+            // positionElements();
+
+            ctx.camera.controls.update();
+            render_frame(ctx);
+        }
+
+        function render_frame(ctx) {
+            ctx.renderer.render(ctx.scene, ctx.camera.object);
+        }
+
+
+        // Kick things off!
+        getData(this);
     }
 
     renderEncomGlobe() {
@@ -585,6 +929,7 @@ class DashboardGlobeDisplay extends React.Component {
         $("#globe").append(globe.domElement);
         globe.init(start);
         globe.renderer.setClearColor('#000000', 0);
+        // globe.renderer.setPixelRatio(window.devicePixelRatio);
 
         function animate() {
             if (globe) {
@@ -741,7 +1086,44 @@ class DashboardGlobeDisplay extends React.Component {
             </div>
         )
     }
-}
+};
+
+class DashboardClockDisplay extends React.Component {
+
+    constructor(props) {
+        super(props);
+
+        this.state = {
+            date: new Date()
+        };
+    }
+
+    componentDidMount() {
+        this.timerID = setInterval(
+          () => this.tick(),
+          1000
+        );
+    }
+
+    componentWillUnmount() {
+        clearInterval(this.timerID);
+    }
+
+    tick() {
+        this.setState({
+            date: new Date()
+        });
+    }
+
+
+    render() {
+        return(
+            <div className="dashboard-clock">
+                {strftime('%H:%M:%S', this.state.date)}
+            </div>
+        );
+    }
+};
 
 class Dashboard extends React.Component {
     constructor(props) {
@@ -797,6 +1179,8 @@ class Dashboard extends React.Component {
 
                     <div className="row">
                         <div className="col-xs-3">
+                            <DashboardClockDisplay />
+
                             <DashboardNodeDisplay
                                 app={this.app} 
                                 socket={this.state.admin_socket}
@@ -824,17 +1208,6 @@ class Dashboard extends React.Component {
                             />
                         </div>
                     </div>
-
-                    {/*
-                    <div className="row">
-                        <div className="col-xs-12">
-                            <DashboardLogDisplay
-                                app={this.app}
-                                socket={this.state.admin_socket}
-                            />
-                        </div>
-                    </div>
-                    */}
                 </div>
             </div>
         );
