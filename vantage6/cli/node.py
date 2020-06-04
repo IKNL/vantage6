@@ -23,8 +23,6 @@ from pathlib import Path
 from threading import Thread
 from colorama import Fore, Style
 
-from ._version import version_info, __version__
-
 from vantage6.common import (
     warning, error, info, debug,
     bytes_to_base64s, check_write_permissions
@@ -150,8 +148,11 @@ def cli_node_new_configuration(name, environment, system_folders):
         exit(1)
 
     # create config in ctx location
+    flag = "--system" if system_folders else ""
     cfg_file = configuration_wizard("node", name, environment, system_folders)
     info(f"New configuration created: {Fore.GREEN}{cfg_file}{Style.RESET_ALL}")
+    info(f"You can start the node by running "
+         f"{Fore.GREEN}vnode start {flag}{Style.RESET_ALL}")
 
 #
 #   files
@@ -457,7 +458,8 @@ def cli_node_attach(name, system_folders):
 @click.option('--system', 'system_folders', flag_value=True)
 @click.option('--user', 'system_folders', flag_value=False, default=N_FOL)
 @click.option('--no-upload', 'upload', flag_value=False, default=True)
-@click.option("-o", "--organization-name", default=None, help="Organization name")
+@click.option("-o", "--organization-name", default=None,
+              help="Organization name")
 @click.option('--overwrite', 'overwrite', flag_value=True, default=False)
 def cli_node_create_private_key(name, environment, system_folders, upload,
                                 organization_name, overwrite):
@@ -468,7 +470,6 @@ def cli_node_create_private_key(name, environment, system_folders, upload,
         host = ctx.config['server_url']
         port = ctx.config['port']
         api_path = ctx.config['api_path']
-        api_key = ctx.config['api_key']
 
         info(f"Connecting to server at '{host}:{port}{api_path}'")
         username = q.text("Username:").ask()

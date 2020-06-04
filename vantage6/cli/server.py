@@ -5,7 +5,6 @@ import docker
 import os
 import time
 
-from pathlib import Path
 from threading import Thread
 from functools import wraps
 from traitlets.config import get_config
@@ -302,9 +301,6 @@ def cli_server_new(name, environment, system_folders):
         print(e)
         exit(1)
 
-    # Check that we can write in this folder
-    dirs = ServerContext.instance_folders("server", name, system_folders)
-    path_ = str(Path(dirs["config"]))
      # Check that we can write in this folder
     if not check_write_permissions(system_folders):
         error("Your user does not have write access to all folders. Exiting")
@@ -322,10 +318,10 @@ def cli_server_new(name, environment, system_folders):
     info(f"New configuration created: {Fore.GREEN}{cfg_file}{Style.RESET_ALL}")
 
     # info(f"root user created.")
+    flag = "" if system_folders else "--user"
     info(
         f"You can start the server by running "
-        f"{Fore.GREEN}vserver start{Style.RESET_ALL} or "
-        f"{Fore.GREEN}vserver start --user{Style.RESET_ALL}."
+        f"{Fore.GREEN}vserver start {flag}{Style.RESET_ALL}"
     )
 
 #
