@@ -60,6 +60,7 @@ def cli_node_list():
 
     running_nodes = client.containers.list(
         filters={"label": f"{APPNAME}-type=node"})
+    
     running_node_names = []
     for node in running_nodes:
         running_node_names.append(node.name)
@@ -190,8 +191,8 @@ def cli_node_files(name, environment, system_folders):
     info(f"Log file           = {ctx.log_file}")
     info(f"data folders       = {ctx.data_dir}")
     info(f"Database labels and files")
+    
     for label, path in ctx.databases.items():
-        print("The correct label and path is as follows:")
         info(f" - {label:15} = {path}")
 
 
