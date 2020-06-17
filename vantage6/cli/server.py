@@ -12,6 +12,7 @@ from colorama import (Fore, Style)
 from sqlalchemy.engine.url import make_url
 
 from vantage6.common import info, warning, error, check_write_permissions
+from vantage6.common.docker_addons import pull_if_newer
 from vantage6.common.globals import APPNAME, STRING_ENCODING
 # from vantage6.cli import fixture
 from vantage6.cli.globals import (DEFAULT_SERVER_ENVIRONMENT,
@@ -128,7 +129,8 @@ def cli_server_start(ctx, ip, port, debug, image, keep):
         )
     info(f"Pulling latest server image '{image}'.")
     try:
-        docker_client.images.pull(image)
+        pull_if_newer(image)
+        # docker_client.images.pull(image)
     except Exception:
         warning("... alas, no dice!")
     else:

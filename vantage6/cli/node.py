@@ -28,6 +28,7 @@ from vantage6.common import (
     bytes_to_base64s, check_write_permissions
 )
 from vantage6.common.globals import (STRING_ENCODING, APPNAME)
+from vantage6.common.docker_addons import pull_if_newer
 from vantage6.client import Client
 from vantage6.client.encryption import RSACryptor
 
@@ -60,7 +61,7 @@ def cli_node_list():
 
     running_nodes = client.containers.list(
         filters={"label": f"{APPNAME}-type=node"})
-    
+
     running_node_names = []
     for node in running_nodes:
         running_node_names.append(node.name)
@@ -124,11 +125,12 @@ def cli_node_new_configuration(name, environment, system_folders):
     # select configuration name if none supplied
     if not name:
         name = q.text("Please enter a configuration-name:").ask()
-        # remove spaces, from name
-        name_new = name.replace(" ", "-")
-        if name != name_new:
-            info(f"Replaced spaces from configuration name: {name}")
-            name = name_new
+
+    # remove spaces, from name
+    name_new = name.replace(" ", "-")
+    if name != name_new:
+        info(f"Replaced spaces from configuration name: {name_new}")
+        name = name_new
 
     if not environment:
         environment = q.select(
@@ -142,6 +144,7 @@ def cli_node_new_configuration(name, environment, system_folders):
             f"Configuration {name} and environment"
             f"{environment} already exists!"
         )
+        exit(1)
 
     # Check that we can write in this folder
     if not check_write_permissions(system_folders):
@@ -181,6 +184,7 @@ def cli_node_files(name, environment, system_folders):
             f"environment {Fore.RED}{environment}{Style.RESET_ALL} could "
             f"not be found."
         )
+        exit(1)
 
     # create node context
     ctx = NodeContext(name, environment=environment,
@@ -191,7 +195,7 @@ def cli_node_files(name, environment, system_folders):
     info(f"Log file           = {ctx.log_file}")
     info(f"data folders       = {ctx.data_dir}")
     info(f"Database labels and files")
-    
+
     for label, path in ctx.databases.items():
         info(f" - {label:15} = {path}")
 
@@ -264,7 +268,7 @@ def cli_node_start(name, config, environment, system_folders, image, keep,
     for node in running_nodes:
         if node.name == f"{APPNAME}-{name}-{suffix}":
             error(f"Node {Fore.RED}{name}{Style.RESET_ALL} is already running")
-            exit()
+            exit(1)
 
     # make sure the (host)-task and -log dir exists
     info("Checking that data and log dirs exist")
@@ -279,7 +283,8 @@ def cli_node_start(name, config, environment, system_folders, image, keep,
 
     info(f"Pulling latest node image '{image}'")
     try:
-        docker_client.images.pull(image)
+        # docker_client.images.pull(image)
+        pull_if_newer(image)
     except Exception:
         warning(' ... alas, no dice!')
     else:
@@ -347,6 +352,7 @@ def cli_node_start(name, config, environment, system_folders, image, keep,
     # debug(f"  with command: '{cmd}'")
     # debug(f"  with mounts: {volumes}")
     # debug(f"  with environment: {env}")
+
     container = docker_client.containers.run(
         image,
         command=cmd,
