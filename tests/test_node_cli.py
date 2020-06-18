@@ -4,10 +4,14 @@ import logging
 from unittest import mock as mock
 from unittest.mock import MagicMock, patch, Mock
 from pathlib import Path
+from io import BytesIO
 from click.testing import CliRunner
+import contextlib
+from io import StringIO
 
 from vantage6.cli.globals import APPNAME
-# from vantage6.common import info, error
+from vantage6.common import STRING_ENCODING
+from docker.errors import APIError
 from vantage6.cli.node import (
     cli_node_list,
     cli_node_new_configuration,
@@ -111,7 +115,7 @@ class NodeCLITest(unittest.TestCase):
         self.assertEqual(result.exit_code, 0)
 
     def test_new_config_replace_whitespace_in_name(self):
-        """"Whitespaces are replaced in the name."""
+        """Whitespaces are replaced in the name."""
 
         runner = CliRunner()
         result = runner.invoke(cli_node_new_configuration, [
@@ -177,7 +181,6 @@ class NodeCLITest(unittest.TestCase):
             [["label", "/file.db"]]
         select_config.return_value = ["iknl", "application"]
 
-        print(select_config)
         runner = CliRunner()
         result = runner.invoke(cli_node_files, [])
 
@@ -189,7 +192,7 @@ class NodeCLITest(unittest.TestCase):
 
     @patch("vantage6.cli.node.NodeContext")
     def test_files_non_existing_config(self, context):
-        """"An error is produced when a non existing config is used."""
+        """An error is produced when a non existing config is used."""
 
         context.config_exists.return_value = False
 
@@ -258,7 +261,7 @@ class NodeCLITest(unittest.TestCase):
     @patch("docker.DockerClient.containers")
     @patch("vantage6.cli.node.check_if_docker_deamon_is_running")
     def test_attach(self, check_docker, containers, log_worker, time_):
-
+        """Attach docker logs without errors."""
         check_docker.return_value = True
 
         container1 = MagicMock()
@@ -276,3 +279,51 @@ class NodeCLITest(unittest.TestCase):
             "[info]  - Closing log file. Keyboard Interrupt.\n"
         )
         self.assertEqual(result.exit_code, 0)
+
+    @patch("vantage6.cli.node.q")
+    @patch("docker.DockerClient.volumes")
+    @patch("vantage6.cli.node.check_if_docker_deamon_is_running")
+    def test_clean(self, check_docker, volumes, q):
+        """Clean Docker volumes without errors."""
+
+        volume1 = MagicMock()
+        volume1.name = "some-name-tmpvol"
+        volumes.list.return_value = [volume1]
+
+        question = MagicMock(name="pop-the-question")
+        question.ask.return_value = True
+        q.confirm.return_value = question
+
+        runner = CliRunner()
+        result = runner.invoke(cli_node_clean)
+
+        # check exit code
+        self.assertEqual(result.exit_code, 0)
+
+    @patch("vantage6.cli.node.q")
+    @patch("docker.DockerClient.volumes")
+    @patch("vantage6.cli.node.check_if_docker_deamon_is_running")
+    def test_clean_docker_error(self, check_docker, volumes, q):
+
+        volume1 = MagicMock()
+        volume1.name = "some-name-tmpvol"
+        volume1.remove.side_effect = APIError("Testing")
+        volumes.list.return_value = [volume1]
+        question = MagicMock(name="pop-the-question")
+        question.ask.return_value = True
+        q.confirm.return_value = question
+
+        runner = CliRunner()
+        result = runner.invoke(cli_node_clean)
+
+        # check exit code
+        self.assertEqual(result.exit_code, 1)
+
+    def test_print_log_worker(self):
+
+        stream = BytesIO("Hello!".encode(STRING_ENCODING))
+        temp_stdout = StringIO()
+        with contextlib.redirect_stdout(temp_stdout):
+            print_log_worker(stream)
+        output = temp_stdout.getvalue().strip()
+        self.assertEqual(output, "Hello!")

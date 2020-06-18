@@ -619,7 +619,9 @@ def cli_node_clean():
             except docker.errors.APIError as e:
                 error(f"Failed to remove volume {Fore.RED}'{volume.name}'"
                       f"{Style.RESET_ALL}. Is it still in use?")
-                error(e)
+                debug(e)
+                exit(1)
+    info("Done!")
 
 
 def print_log_worker(logs_stream):
