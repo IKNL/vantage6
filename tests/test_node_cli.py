@@ -300,6 +300,22 @@ class NodeCLITest(unittest.TestCase):
         # check exit code
         self.assertEqual(result.exit_code, 0)
 
+    @patch("vantage6.cli.node.create_client_and_authenticate")
+    @patch("vantage6.cli.node.NodeContext")
+    def test_create_private_key(self, context, client):
+        context.config_exists.return_value = True
+        context.return_value.type_data_folder.return_value = Path(".")
+        client.return_value = MagicMock(
+            whoami=MagicMock(organization_name="Test")
+        )
+        # client.whoami.organization_name = "Test"
+        runner = CliRunner()
+
+        result = runner.invoke(cli_node_create_private_key,
+                               ["--name", "application"])
+
+        self.assertEqual(result.exit_code, 0)
+
     @patch("vantage6.cli.node.q")
     @patch("docker.DockerClient.volumes")
     @patch("vantage6.cli.node.check_if_docker_deamon_is_running")

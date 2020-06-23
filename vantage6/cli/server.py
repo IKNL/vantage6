@@ -96,7 +96,7 @@ def cli_server():
 #
 @cli_server.command(name='start')
 @click.option('--ip', default=None, help='ip address to listen on')
-@click.option('-p', '--port', type=int, help='port to listen on')
+@click.option('-p', '--port', default=None, type=int, help='port to listen on')
 @click.option('--debug', is_flag=True,
               help='run server in debug mode (auto-restart)')
 @click.option('-i', '--image', default=None, help="Node Docker image to use")
@@ -112,11 +112,11 @@ def cli_server_start(ctx, ip, port, debug, image, keep):
     # will print an error if not
     check_if_docker_deamon_is_running(docker_client)
 
-    # check that this node is not already running
+    # check that this server is not already running
     running_servers = docker_client.containers.list(
         filters={"label": f"{APPNAME}-type=server"})
-    for node in running_servers:
-        if node.name == f"{APPNAME}-{ctx.name}-{ctx.scope}-server":
+    for server in running_servers:
+        if server.name == f"{APPNAME}-{ctx.name}-{ctx.scope}-server":
             error(f"Server {Fore.RED}{ctx.name}{Style.RESET_ALL} "
                   "is already running")
             exit(1)

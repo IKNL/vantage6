@@ -472,28 +472,6 @@ def cli_node_create_private_key(name, environment, system_folders, upload,
                                 organization_name, overwrite):
     """Create and upload a new private key (use with caughtion)"""
 
-    def create_client_and_authenticate(ctx):
-        """Create a client and authenticate."""
-        host = ctx.config['server_url']
-        port = ctx.config['port']
-        api_path = ctx.config['api_path']
-
-        info(f"Connecting to server at '{host}:{port}{api_path}'")
-        username = q.text("Username:").ask()
-        password = q.password("Password:").ask()
-
-        client = Client(host, port, api_path)
-
-        try:
-            client.authenticate(username, password)
-
-        except Exception as e:
-            error("Could not authenticate with server!")
-            debug(e)
-            exit(1)
-
-        return client
-
     # retrieve context
     name, environment = (name, environment) if name else \
         select_configuration_questionaire("node", system_folders)
@@ -635,3 +613,26 @@ def check_if_docker_deamon_is_running(docker_client):
     except Exception:
         error("Docker socket can not be found. Make sure Docker is running.")
         exit(1)
+
+
+def create_client_and_authenticate(ctx):
+    """Create a client and authenticate."""
+    host = ctx.config['server_url']
+    port = ctx.config['port']
+    api_path = ctx.config['api_path']
+
+    info(f"Connecting to server at '{host}:{port}{api_path}'")
+    username = q.text("Username:").ask()
+    password = q.password("Password:").ask()
+
+    client = Client(host, port, api_path)
+
+    try:
+        client.authenticate(username, password)
+
+    except Exception as e:
+        error("Could not authenticate with server!")
+        debug(e)
+        exit(1)
+
+    return client
