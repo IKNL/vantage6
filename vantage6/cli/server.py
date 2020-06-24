@@ -526,7 +526,7 @@ def cli_server_stop(name, system_folders, all_servers):
 @click.option('--system', 'system_folders', flag_value=True)
 @click.option('--user', 'system_folders', flag_value=False,
               default=DEFAULT_SERVER_SYSTEM_FOLDERS)
-def cli_node_attach(name, system_folders):
+def cli_server_attach(name, system_folders):
     """Attach the logs from the docker container to the terminal."""
 
     client = docker.from_env()
