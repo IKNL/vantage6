@@ -1,18 +1,10 @@
 import unittest
-import logging
 
-from unittest import mock as mock
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, patch
 from pathlib import Path
-from io import BytesIO
 from click.testing import CliRunner
-import contextlib
-from io import StringIO
 
 from vantage6.cli.globals import APPNAME
-from vantage6.common import STRING_ENCODING
-from docker.errors import APIError
-
 from vantage6.cli.server import (
     cli_server_start,
     cli_server_configuration_list,
@@ -105,7 +97,7 @@ class ServerCLITest(unittest.TestCase):
     def test_import(self, context, docker_check, click_path, log, containers):
         """Import entities without errors."""
         click_path.return_value = MagicMock()
-        
+
         runner = CliRunner()
         with runner.isolated_filesystem():
             with open("some.yaml", "w") as fp:
@@ -113,23 +105,23 @@ class ServerCLITest(unittest.TestCase):
             result = runner.invoke(cli_server_import, [
                 "--name", "iknl", "some.yaml"
             ])
-        
+
         self.assertIsNone(result.exception)
         self.assertEqual(result.exit_code, 0)
-    
+
     @patch("vantage6.cli.server.configuration_wizard")
     @patch("vantage6.cli.server.check_write_permissions")
     @patch("vantage6.cli.server.ServerContext")
     def test_new(self, context, permissions, wizard):
         """New configuration without errors."""
-        
+
         context.config_exists.return_value = False
         permissions.return_value = True
         wizard.return_value = "/some/file.yaml"
 
         runner = CliRunner()
         result = runner.invoke(cli_server_new, ["--name", "iknl"])
-        
+
 
         self.assertIsNone(result.exception)
         self.assertEqual(result.exit_code, 0)
@@ -166,4 +158,4 @@ class ServerCLITest(unittest.TestCase):
         self.assertIsNone(result.exception)
         self.assertEqual(result.exit_code, 0)
 
-    
+
