@@ -1,8 +1,7 @@
 import unittest
 import logging
 
-from unittest import mock as mock
-from unittest.mock import MagicMock, patch, Mock
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 from io import BytesIO
 from click.testing import CliRunner
@@ -22,7 +21,7 @@ from vantage6.cli.node import (
     cli_node_create_private_key,
     cli_node_clean,
     print_log_worker,
-    check_if_docker_deamon_is_running
+    # check_if_docker_deamon_is_running
 )
 
 
