@@ -21,7 +21,8 @@ from vantage6.cli.node import (
     cli_node_create_private_key,
     cli_node_clean,
     print_log_worker,
-    # check_if_docker_deamon_is_running
+    create_client_and_authenticate,
+    check_if_docker_deamon_is_running
 )
 
 
@@ -89,8 +90,6 @@ class NodeCLITest(unittest.TestCase):
             "iknl                     ['Application']                 Online           User   \n"
             "-------------------------------------------------------------------------------------\n"
         )
-
-    # @patch("questionary.prompts.text", return_value="config_name")
 
     @patch("vantage6.cli.node.configuration_wizard")
     @patch("vantage6.cli.node.check_write_permissions")
@@ -315,6 +314,61 @@ class NodeCLITest(unittest.TestCase):
 
         self.assertEqual(result.exit_code, 0)
 
+    @patch("vantage6.cli.node.RSACryptor")
+    @patch("vantage6.cli.node.create_client_and_authenticate")
+    @patch("vantage6.cli.node.NodeContext")
+    def test_create_private_key_overwite(self, context, client, cryptor):
+        context.config_exists.return_value = True
+        context.return_value.type_data_folder.return_value = Path(".")
+        client.return_value = MagicMock(
+            whoami=MagicMock(organization_name="Test")
+        )
+        cryptor.create_public_key_bytes.return_value = b''
+        # client.whoami.organization_name = "Test"
+
+        runner = CliRunner()
+
+        # overwrite
+        with runner.isolated_filesystem():
+            with open("privkey_iknl.pem", "w") as f:
+                f.write("does-not-matter")
+
+            result = runner.invoke(cli_node_create_private_key, [
+                "--name",
+                "application",
+                "--overwrite",
+                "--organization-name",
+                "iknl"
+            ])
+        self.assertEqual(result.exit_code, 0)
+
+        # do not overwrite
+        with runner.isolated_filesystem():
+            with open("privkey_iknl.pem", "w") as f:
+                f.write("does-not-matter")
+
+            result = runner.invoke(cli_node_create_private_key, [
+                "--name",
+                "application",
+                "--organization-name",
+                "iknl"
+            ])
+
+            print(result.output)
+
+        self.assertEqual(result.exit_code, 0)
+
+    @patch("vantage6.cli.node.NodeContext")
+    def test_create_private_key_config_not_found(self, context):
+        context.config_exists.return_value = False
+
+        runner = CliRunner()
+        result = runner.invoke(cli_node_create_private_key,
+                               ["--name", "application"])
+
+        self.assertEqual(result.exit_code, 1)
+
+
     @patch("vantage6.cli.node.q")
     @patch("docker.DockerClient.volumes")
     @patch("vantage6.cli.node.check_if_docker_deamon_is_running")
@@ -335,10 +389,47 @@ class NodeCLITest(unittest.TestCase):
         self.assertEqual(result.exit_code, 1)
 
     def test_print_log_worker(self):
-
         stream = BytesIO("Hello!".encode(STRING_ENCODING))
         temp_stdout = StringIO()
         with contextlib.redirect_stdout(temp_stdout):
             print_log_worker(stream)
         output = temp_stdout.getvalue().strip()
         self.assertEqual(output, "Hello!")
+
+    @patch("vantage6.cli.node.info")
+    @patch("vantage6.cli.node.debug")
+    @patch("vantage6.cli.node.error")
+    @patch("vantage6.cli.node.Client")
+    @patch("vantage6.cli.node.q")
+    def test_client(self, q, client, error, debug, info):
+
+        ctx = MagicMock(
+            config={
+                "server_url": "localhost",
+                "port": 5000,
+                "api_path": ""
+            }
+        )
+
+        # should not trigger an exception
+        try:
+            create_client_and_authenticate(ctx)
+        except Exception:
+            self.fail("Raised an exception!")
+
+        # client raises exception
+        client.side_effect = Exception("Boom!")
+        with self.assertRaises(Exception):
+            create_client_and_authenticate(ctx)
+
+    @patch("vantage6.cli.node.error")
+    def test_check_docker(self, error):
+        docker = MagicMock()
+        try:
+            check_if_docker_deamon_is_running(docker)
+        except Exception:
+            self.fail("Exception raised!")
+
+        docker.ping.side_effect = Exception("Boom!")
+        with self.assertRaises(SystemExit):
+            check_if_docker_deamon_is_running(docker)

@@ -25,7 +25,7 @@ class ServerCLITest(unittest.TestCase):
     @patch("docker.DockerClient.containers")
     @patch("vantage6.cli.server.check_if_docker_deamon_is_running")
     def test_start(self, docker_check, containers, context,
-                                     pull, os_makedirs, mount):
+                   pull, os_makedirs, mount):
         """Start server without errors"""
 
         docker_check.return_value = True
@@ -88,7 +88,6 @@ class ServerCLITest(unittest.TestCase):
         self.assertIsNone(result.exception)
         self.assertEqual(result.exit_code, 0)
 
-
     @patch("docker.DockerClient.containers")
     @patch("vantage6.cli.server.print_log_worker")
     @patch("vantage6.cli.server.click.Path")
@@ -121,7 +120,6 @@ class ServerCLITest(unittest.TestCase):
 
         runner = CliRunner()
         result = runner.invoke(cli_server_new, ["--name", "iknl"])
-
 
         self.assertIsNone(result.exception)
         self.assertEqual(result.exit_code, 0)
@@ -157,5 +155,3 @@ class ServerCLITest(unittest.TestCase):
 
         self.assertIsNone(result.exception)
         self.assertEqual(result.exit_code, 0)
-
-

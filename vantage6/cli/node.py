@@ -484,6 +484,7 @@ def cli_node_create_private_key(name, environment, system_folders, upload,
             f"environment {Fore.RED}{environment}{Style.RESET_ALL} could "
             f"not be found."
         )
+        exit(1)
 
     # Create node context
     ctx = NodeContext(name, environment, system_folders)
