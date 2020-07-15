@@ -289,7 +289,7 @@ def cli_node_start(name, config, environment, system_folders, image, keep,
     except Exception:
         warning(' ... alas, no dice!')
     else:
-        info(" ... succes!")
+        info(" ... success!")
 
     info("Creating Docker data volume")
     data_volume = docker_client.volumes.create(
@@ -370,7 +370,7 @@ def cli_node_start(name, config, environment, system_folders, image, keep,
         tty=True
     )
 
-    info(f"Succes! container id = {container}")
+    info(f"Success! container id = {container}")
 
 
 #
@@ -575,8 +575,7 @@ def cli_node_create_private_key(name, environment, system_folders, upload,
 #
 @cli_node.command(name='clean')
 def cli_node_clean():
-    """
-    """
+    """ This command erases docker volumes"""
     client = docker.from_env()
     check_if_docker_deamon_is_running(client)
 
