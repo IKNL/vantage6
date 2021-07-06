@@ -222,12 +222,13 @@ help_ = {
 @click.option('-i', '--image', default=None, help="Node Docker image to use")
 @click.option('--keep/--auto-remove', default=False,
               help="Keep image after finishing")
-@click.option('--attach/--detach', default=False,
-              help="Attach node logs to the console after start")
 @click.option('--mount-src', default='',
               help="mount vantage6-master package source")
+@click.option('--attach/--detach', default=False,
+              help="Attach node logs to the console after start")
+@click.option('-p', '--port', default=5050, help="api forwarder port")
 def cli_node_start(name, config, environment, system_folders, image, keep,
-                   mount_src, attach):
+                   mount_src, attach, port):
     """Start the node instance.
 
         If no name or config is specified the default.yaml configuation is
@@ -376,7 +377,7 @@ def cli_node_start(name, config, environment, system_folders, image, keep,
     # debug(f"  with command: '{cmd}'")
     # debug(f"  with mounts: {volumes}")
     # debug(f"  with environment: {env}")
-
+    api_forwarder_port = ctx.config.get('api_forwarder_port', 5555)
     container = docker_client.containers.run(
         image,
         command=cmd,
@@ -388,8 +389,9 @@ def cli_node_start(name, config, environment, system_folders, image, keep,
             "name": ctx.config_file_name
         },
         environment=env,
+        ports={f"{api_forwarder_port}/tcp": ("0.0.0.0", port)},
         name=ctx.docker_container_name,
-        auto_remove=not keep,
+        auto_remove=(not keep),
         tty=True
     )
 
