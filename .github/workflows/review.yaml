@@ -1,0 +1,59 @@
+
+# This worflow executes the tests, calculates coverage and code quality
+
+name: Review
+
+on:
+  push:
+    branches:
+      - master
+      - DEV**
+      - hotfix
+      - 'feature/**'
+      - 'bugfix/**'
+      - 'release/**'
+  pull_request:
+    branches:
+      - master
+      - DEV**
+
+jobs:
+  coveralls:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+
+    - name: Set up Python 3.7
+      uses: actions/setup-python@v2
+      with:
+        python-version: 3.7
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        pip install python-coveralls
+        pip install coverage
+        pip install -r requirements.txt
+        pip install -e .[dev]
+
+    - name: Test with coveralls
+      run: |
+        coverage run --source=vantage6 --omit="utest.py","*.html","*.htm","*.txt","*.yml","*.yaml" ./utest.py
+
+    - name: Coveralls
+      env:
+        COVERALLS_REPO_TOKEN: ${{ secrets.COVERALLS_TOKEN }}
+      run: coveralls
+
+  codacy:
+    name: Codacy Analysis CLI
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@main
+
+      - name: Run Codacy Analysis CLI
+        uses: codacy/codacy-analysis-cli-action@master
