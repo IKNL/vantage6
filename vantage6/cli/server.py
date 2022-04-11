@@ -17,7 +17,7 @@ from vantage6.common.docker_addons import (
     pull_if_newer, remove_container_if_exists,
     get_server_config_name
 )
-from vantage6.common.docker.network_manager import NetworkManager
+from vantage6.common.network_manager import NetworkManager
 from vantage6.common.globals import (
     APPNAME,
     STRING_ENCODING,

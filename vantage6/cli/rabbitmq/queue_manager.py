@@ -12,7 +12,7 @@ from typing import Dict
 from vantage6.common.globals import APPNAME
 from vantage6.common import debug, info, error
 from vantage6.common.docker_addons import remove_container_if_exists
-from vantage6.common.docker.network_manager import NetworkManager
+from vantage6.common.network_manager import NetworkManager
 from vantage6.cli.context import ServerContext
 from vantage6.cli.rabbitmq.definitions import RABBITMQ_DEFINITIONS
 from vantage6.cli.globals import RABBIT_TIMEOUT
